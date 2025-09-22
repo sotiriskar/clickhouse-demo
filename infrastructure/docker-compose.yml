@@ -10,6 +10,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      - postgres_data:/var/lib/postgresql/data
       - ./sql/postgres.sql:/docker-entrypoint-initdb.d/postgres.sql
     command: >
       postgres
@@ -282,6 +283,7 @@ services:
       retries: 5
 
 volumes:
+  postgres_data:
   financial_data:
   financial_network:
 

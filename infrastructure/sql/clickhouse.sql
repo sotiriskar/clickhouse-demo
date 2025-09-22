@@ -3,44 +3,45 @@
 -- ===========================================
 
 -- Databases
-CREATE DATABASE IF NOT EXISTS raw_data;
+CREATE DATABASE IF NOT EXISTS materialized_views;
 CREATE DATABASE IF NOT EXISTS analytics;
 CREATE DATABASE IF NOT EXISTS reporting;
-CREATE DATABASE IF NOT EXISTS materialized_views;
+CREATE DATABASE IF NOT EXISTS streams;
+CREATE DATABASE IF NOT EXISTS kafka;
 
 -- ===========================================
 -- KAFKA TABLES (CDC Integration)
 -- ===========================================
 
-CREATE TABLE IF NOT EXISTS materialized_views.kafka_transactions_raw
+CREATE TABLE IF NOT EXISTS kafka.kafka_transactions_raw
 (
     msg String
 )
 ENGINE = Kafka('broker-kafka:29092', 'financial.public.raw_transactions', 'ch_group_transactions', 'JSONAsString')
 SETTINGS kafka_thread_per_consumer = 0, kafka_num_consumers = 1;
 
-CREATE TABLE IF NOT EXISTS materialized_views.kafka_accounts_raw
+CREATE TABLE IF NOT EXISTS kafka.kafka_accounts_raw
 (
     msg String
 )
 ENGINE = Kafka('broker-kafka:29092', 'financial.public.raw_accounts', 'ch_group_accounts', 'JSONAsString')
 SETTINGS kafka_thread_per_consumer = 0, kafka_num_consumers = 1;
 
-CREATE TABLE IF NOT EXISTS materialized_views.kafka_merchants_raw
+CREATE TABLE IF NOT EXISTS kafka.kafka_merchants_raw
 (
     msg String
 )
 ENGINE = Kafka('broker-kafka:29092', 'financial.public.raw_merchants', 'ch_group_merchants', 'JSONAsString')
 SETTINGS kafka_thread_per_consumer = 0, kafka_num_consumers = 1;
 
-CREATE TABLE IF NOT EXISTS materialized_views.kafka_fx_rates_raw
+CREATE TABLE IF NOT EXISTS kafka.kafka_fx_rates_raw
 (
     msg String
 )
 ENGINE = Kafka('broker-kafka:29092', 'financial.public.raw_fx_rates', 'ch_group_fx_rates', 'JSONAsString')
 SETTINGS kafka_thread_per_consumer = 0, kafka_num_consumers = 1;
 
-CREATE TABLE IF NOT EXISTS materialized_views.kafka_ip_geo_raw
+CREATE TABLE IF NOT EXISTS kafka.kafka_ip_geo_raw
 (
     msg String
 )
@@ -51,7 +52,7 @@ SETTINGS kafka_thread_per_consumer = 0, kafka_num_consumers = 1;
 -- RAW DATA LAYER (Bronze)
 -- ===========================================
 
-CREATE TABLE IF NOT EXISTS raw_data.transactions_raw
+CREATE TABLE IF NOT EXISTS streams.transactions_raw
 (
     transaction_id String,
     account_id String,
@@ -68,7 +69,7 @@ ENGINE = ReplacingMergeTree(version)
 ORDER BY (account_id, timestamp)
 PARTITION BY toYYYYMM(timestamp);
 
-CREATE TABLE IF NOT EXISTS raw_data.accounts_raw
+CREATE TABLE IF NOT EXISTS streams.accounts_raw
 (
     account_id String,
     user_name String,
@@ -80,7 +81,7 @@ CREATE TABLE IF NOT EXISTS raw_data.accounts_raw
 ENGINE = ReplacingMergeTree(version)
 ORDER BY account_id;
 
-CREATE TABLE IF NOT EXISTS raw_data.merchants_raw
+CREATE TABLE IF NOT EXISTS streams.merchants_raw
 (
     merchant_id String,
     merchant_name String,
@@ -92,7 +93,7 @@ CREATE TABLE IF NOT EXISTS raw_data.merchants_raw
 ENGINE = ReplacingMergeTree(version)
 ORDER BY merchant_id;
 
-CREATE TABLE IF NOT EXISTS raw_data.fx_rates_raw
+CREATE TABLE IF NOT EXISTS streams.fx_rates_raw
 (
     date Date,
     currency String,
@@ -103,7 +104,7 @@ ENGINE = ReplacingMergeTree(version)
 ORDER BY (date, currency)
 PARTITION BY toYYYYMM(date);
 
-CREATE TABLE IF NOT EXISTS raw_data.ip_geo_raw
+CREATE TABLE IF NOT EXISTS streams.ip_geo_raw
 (
     ip String,
     country String,
@@ -119,7 +120,7 @@ ORDER BY ip;
 -- ===========================================
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS materialized_views.mv_transactions_raw
-TO raw_data.transactions_raw AS
+TO streams.transactions_raw AS
 SELECT
     JSONExtract(msg, 'payload', 'after', 'transaction_id', 'String') AS transaction_id,
     JSONExtract(msg, 'payload', 'after', 'account_id', 'String') AS account_id,
@@ -131,11 +132,11 @@ SELECT
     JSONExtract(msg, 'payload', 'after', 'ip', 'String') AS ip,
     JSONExtract(msg, 'payload', 'after', 'device_id', 'String') AS device_id,
     JSONExtract(msg, 'payload', 'source', 'ts_ms', 'UInt64') AS version
-FROM materialized_views.kafka_transactions_raw
+FROM kafka.kafka_transactions_raw
 WHERE JSONExtract(msg, 'payload', 'op', 'String') IN ('c','r','u') AND length(msg) > 0;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS materialized_views.mv_accounts_raw
-TO raw_data.accounts_raw AS
+TO streams.accounts_raw AS
 SELECT
     JSONExtract(msg, 'payload', 'after', 'account_id', 'String') AS account_id,
     JSONExtract(msg, 'payload', 'after', 'user_name', 'String') AS user_name,
@@ -143,11 +144,11 @@ SELECT
     JSONExtract(msg, 'payload', 'after', 'country', 'String') AS country,
     toDateTime(JSONExtract(msg, 'payload', 'after', 'signup_date', 'UInt64') / 1000000) AS signup_date,
     JSONExtract(msg, 'payload', 'source', 'ts_ms', 'UInt64') AS version
-FROM materialized_views.kafka_accounts_raw
+FROM kafka.kafka_accounts_raw
 WHERE JSONExtract(msg, 'payload', 'op', 'String') IN ('c','r','u') AND length(msg) > 0;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS materialized_views.mv_merchants_raw
-TO raw_data.merchants_raw AS
+TO streams.merchants_raw AS
 SELECT
     JSONExtract(msg, 'payload', 'after', 'merchant_id', 'String') AS merchant_id,
     JSONExtract(msg, 'payload', 'after', 'merchant_name', 'String') AS merchant_name,
@@ -155,28 +156,28 @@ SELECT
     JSONExtract(msg, 'payload', 'after', 'country', 'String') AS country,
     JSONExtract(msg, 'payload', 'after', 'risk_rating', 'UInt8') AS risk_rating,
     JSONExtract(msg, 'payload', 'source', 'ts_ms', 'UInt64') AS version
-FROM materialized_views.kafka_merchants_raw
+FROM kafka.kafka_merchants_raw
 WHERE JSONExtract(msg, 'payload', 'op', 'String') IN ('c','r','u') AND length(msg) > 0;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS materialized_views.mv_fx_rates_raw
-TO raw_data.fx_rates_raw AS
+TO streams.fx_rates_raw AS
 SELECT
     toDate(JSONExtract(msg, 'payload', 'after', 'date', 'Int32')) AS date,
     JSONExtract(msg, 'payload', 'after', 'currency', 'String') AS currency,
     JSONExtract(msg, 'payload', 'after', 'rate_to_eur', 'String') AS rate_to_eur,
     JSONExtract(msg, 'payload', 'source', 'ts_ms', 'UInt64') AS version
-FROM materialized_views.kafka_fx_rates_raw
+FROM kafka.kafka_fx_rates_raw
 WHERE JSONExtract(msg, 'payload', 'op', 'String') IN ('c','r','u') AND length(msg) > 0;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS materialized_views.mv_ip_geo_raw
-TO raw_data.ip_geo_raw AS
+TO streams.ip_geo_raw AS
 SELECT
     JSONExtract(msg, 'payload', 'after', 'ip', 'String') AS ip,
     JSONExtract(msg, 'payload', 'after', 'country', 'String') AS country,
     JSONExtract(msg, 'payload', 'after', 'city', 'String') AS city,
     JSONExtract(msg, 'payload', 'after', 'is_proxy_or_vpn', 'UInt8') AS is_proxy_or_vpn,
     JSONExtract(msg, 'payload', 'source', 'ts_ms', 'UInt64') AS version
-FROM materialized_views.kafka_ip_geo_raw
+FROM kafka.kafka_ip_geo_raw
 WHERE JSONExtract(msg, 'payload', 'op', 'String') IN ('c','r','u') AND length(msg) > 0;
 
 -- ===========================================
@@ -258,9 +259,9 @@ SELECT
     ip.city AS ip_city,
     t.device_id AS device_id,
     t.status AS status
-FROM raw_data.transactions_raw AS t
-LEFT JOIN raw_data.accounts_raw AS a ON t.account_id = a.account_id
-LEFT JOIN raw_data.ip_geo_raw AS ip ON t.ip = ip.ip;
+FROM streams.transactions_raw AS t
+LEFT JOIN streams.accounts_raw AS a ON t.account_id = a.account_id
+LEFT JOIN streams.ip_geo_raw AS ip ON t.ip = ip.ip;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS materialized_views.mv_accounts_silver
 TO analytics.accounts AS
@@ -271,7 +272,7 @@ SELECT
     signup_date,
     dateDiff('day', signup_date, now()) AS account_age_days,
     country AS country_normalized
-FROM raw_data.accounts_raw;
+FROM streams.accounts_raw;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS materialized_views.mv_merchants_silver
 TO analytics.merchants AS
@@ -281,7 +282,7 @@ SELECT
     merchant_category,
     country AS merchant_country,
     risk_rating
-FROM raw_data.merchants_raw;
+FROM streams.merchants_raw;
 
 -- ===========================================
 -- GOLD LAYER (Reporting)
