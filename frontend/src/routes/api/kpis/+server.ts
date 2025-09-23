@@ -4,7 +4,7 @@ import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url }) => {
   try {
-    const days = parseInt(url.searchParams.get('days') || '30');
+    const days = parseInt(url.searchParams.get('days') || '7');
     const result = await clickhouse.getDailyKPIs(days);
     return json(result);
   } catch (error) {

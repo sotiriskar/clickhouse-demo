@@ -6,8 +6,12 @@ export const GET: RequestHandler = async ({ url }) => {
   try {
     const searchTerm = url.searchParams.get('search') || '';
     const limit = parseInt(url.searchParams.get('limit') || '20');
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const offset = (page - 1) * limit;
+    const sortColumn = url.searchParams.get('sort') || '';
+    const sortOrder = url.searchParams.get('order') || 'desc';
     
-    const result = await clickhouse.searchAccounts(searchTerm, limit);
+    const result = await clickhouse.searchAccounts(searchTerm, limit, offset, sortColumn, sortOrder);
     return json(result);
   } catch (error) {
     console.error('Error fetching accounts:', error);

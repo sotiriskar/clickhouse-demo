@@ -73,7 +73,18 @@ def generate_transactions(n):
     for _ in range(n):
         transaction_id = fake.uuid4()
         account_id, *_ = random.choice(ACCOUNTS_POOL)
-        timestamp = fake.date_time_between(start_date="-1d", end_date="now")
+        # More varied distribution: 30% today, 40% last 7 days, 30% older
+        rand = random.random()
+        if rand < 0.5:
+            # Today from midnight to now
+            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            timestamp = fake.date_time_between(start_date=today_start, end_date="now")
+        elif rand < 0.8:
+            # Last 7 days
+            timestamp = fake.date_time_between(start_date="-7d", end_date="now")
+        else:
+            # Older data (up to 30 days ago)
+            timestamp = fake.date_time_between(start_date="-30d", end_date="-7d")
         amount = round(random.uniform(1.0, 5000.0), 2)
         currency = random.choice(currencies)
         merchant = random.choice(MERCHANTS_POOL)["merchant_id"]

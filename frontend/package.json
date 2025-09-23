@@ -25,6 +25,7 @@
 		"chart.js": "^4.5.0",
 		"chartjs-adapter-date-fns": "^3.0.0",
 		"date-fns": "^4.1.0",
-		"lucide-svelte": "^0.544.0"
+		"lucide-svelte": "^0.544.0",
+		"svelte-paginate": "^0.1.0"
 	}
 }

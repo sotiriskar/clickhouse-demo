@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Dashboard from '$lib/components/Dashboard.svelte';
+  import ClickHouseLogo from '$lib/assets/clickhouse-yellow-badge.svg';
 
   let activeTab = 'gold';
 
@@ -13,13 +14,22 @@
   function setActiveTab(tabId: string) {
     activeTab = tabId;
   }
+
+  // Update page title based on active tab
+  $: pageTitle = `ClickHouse Analytics - ${tabs.find(tab => tab.id === activeTab)?.label || 'Dashboard'}`;
 </script>
+
+<svelte:head>
+  <title>{pageTitle}</title>
+</svelte:head>
 
 <div class="dashboard-container">
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-header">
-      <!-- Logo removed -->
+      <div class="clickhouse-badge">
+        <img src={ClickHouseLogo} alt="ClickHouse" />
+      </div>
     </div>
     
     <nav class="sidebar-nav">
@@ -88,12 +98,29 @@
   }
 
   .sidebar-header {
-    padding: 1.5rem 2rem;
-    padding-bottom: 6rem;
+    padding: 1rem;
     border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 120px;
   }
 
-  /* Logo styles removed */
+  .clickhouse-badge {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .clickhouse-badge img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
 
   .sidebar-nav {
     padding: 1rem;
