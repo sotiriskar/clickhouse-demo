@@ -300,35 +300,6 @@ ENGINE = SummingMergeTree()
 ORDER BY date
 PARTITION BY toYYYYMM(date);
 
-CREATE TABLE IF NOT EXISTS reporting.merchant_metrics
-(
-    merchant_id String,
-    merchant_name String,
-    date Date,
-    transactions UInt64,
-    revenue_eur Decimal(12,2),
-    unique_customers UInt64
-)
-ENGINE = SummingMergeTree()
-ORDER BY (merchant_id, date)
-PARTITION BY toYYYYMM(date);
-
-CREATE TABLE IF NOT EXISTS reporting.fraud_features
-(
-    account_id String,
-    date Date,
-    num_txn UInt64,
-    daily_volume Decimal(12,2),
-    max_txn Decimal(12,2),
-    num_countries_used UInt64,
-    num_devices_used UInt64,
-    country_mismatch_count UInt64,
-    high_value_txn_count UInt64
-)
-ENGINE = AggregatingMergeTree()
-ORDER BY (account_id, date)
-PARTITION BY toYYYYMM(date);
-
 -- ===========================================
 -- GOLD MATERIALIZED VIEWS
 -- ===========================================
@@ -343,31 +314,3 @@ SELECT
     uniqExact(account_id) AS active_accounts
 FROM analytics.transactions
 GROUP BY date;
-
-CREATE MATERIALIZED VIEW IF NOT EXISTS materialized_views.mv_merchant_metrics
-TO reporting.merchant_metrics AS
-SELECT
-    m.merchant_id AS merchant_id,
-    m.merchant_name AS merchant_name,
-    t.date AS date,
-    count() AS transactions,
-    sum(t.amount_eur) AS revenue_eur,
-    uniqExact(t.account_id) AS unique_customers
-FROM analytics.transactions AS t
-JOIN analytics.merchants AS m ON t.merchant_id = m.merchant_id
-GROUP BY m.merchant_id, m.merchant_name, t.date;
-
-CREATE MATERIALIZED VIEW IF NOT EXISTS materialized_views.mv_fraud_features
-TO reporting.fraud_features AS
-SELECT
-    account_id,
-    date,
-    count() AS num_txn,
-    sum(amount_eur) AS daily_volume,
-    max(amount_eur) AS max_txn,
-    uniqExact(ip_country) AS num_countries_used,
-    uniqExact(device_id) AS num_devices_used,
-    sumIf(1, account_country != ip_country) AS country_mismatch_count,
-    sumIf(1, amount_eur > 1000) AS high_value_txn_count
-FROM analytics.transactions
-GROUP BY account_id, date;
